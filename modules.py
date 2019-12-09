@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch 
 from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 import imageio
 import pickle
 
@@ -10,7 +11,7 @@ class DanceImageDataset(Dataset):
     generate dance image dataset
     TODO: interpolation
     """
-    def __init__(self, image_dir, stick_dir, list_pkl_file, transform=None):
+    def __init__(self, image_dir, stick_dir, list_pkl_file, transform=True):
         """
         SEE https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
 
@@ -21,7 +22,10 @@ class DanceImageDataset(Dataset):
         """
         self.image_dir = image_dir
         self.stick_dir = stick_dir
-        self.transform = transform
+        self.whether_transform = transform
+        self.transformation = transforms.Compose([transforms.ToTensor(),
+                                                transforms.Normalize((0.5, 0.5, 0.5),
+                                                                    (0.5, 0.5, 0.5))])
         with open(list_pkl_file, 'rb') as f:
             self.filename_list=pickle.load(f)  
 
@@ -34,13 +38,13 @@ class DanceImageDataset(Dataset):
 
         img_name = os.path.join(self.image_dir, self.filename_list[idx])
         stick_name = os.path.join(self.stick_dir, self.filename_list[idx])
-        image = imageio.imread(img_name)
-        stick = imageio.imread(stick_name)
+        image = np.array(imageio.imread(img_name))
+        stick = np.array(imageio.imread(stick_name))
 
-        sample = {'image': image, 'stick': stick}
-
-        if self.transform:
-            sample = self.transform(sample)
+        if self.whether_transform:
+            sample = {'image': self.transformation(image), 'stick': self.transformation(stick)}
+        else:
+            sample = {'image': image, 'stick': stick}
 
         return sample
 
@@ -79,18 +83,3 @@ class Rescale(object):
         # x and y axes are axis 1 and 0 respectively
 
         return {'image': img_transform, 'stick': stk_transform}
-
-
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-
-    def __call__(self, sample):
-        image, stick = sample['image'], sample['stick']
-
-        # swap color axis because
-        # numpy image: H x W x C
-        # torch image: C X H X W
-        image = image.transpose((2, 0, 1))
-        stick = stick.transpose((2, 0, 1))
-        return {'image': torch.from_numpy(image),
-                'stick': torch.from_numpy(stick)}
